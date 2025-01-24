@@ -1,0 +1,33 @@
+FROM golang:1.22-alpine
+
+WORKDIR /app 
+
+# Install development tools and dependencies
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    postgresql-client \
+    bash \
+    git \
+    curl \
+    delve
+
+# Install golang-migrate
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.0
+
+# Install air for hot reloading
+RUN go install github.com/cosmtrek/air@v1.49.0
+
+# Install development tools
+RUN go install golang.org/x/tools/gopls@v0.14.2 
+RUN go install github.com/go-delve/delve/cmd/dlv@v1.22.0
+
+# Set up entrypoint permissions (the file will be mounted at runtime)
+RUN touch /usr/local/bin/dev-entrypoint.sh \
+    && chmod +x /usr/local/bin/dev-entrypoint.sh
+
+EXPOSE 8080 2345 
+
+ENTRYPOINT ["/usr/local/bin/dev-entrypoint.sh"]
+# The default CMD will be passed to the entrypoint 
+CMD ["go", "run", "cmd/main.go"]

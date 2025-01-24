@@ -1,36 +1,45 @@
-FROM golang:1.22-alpine
+# Build stage
+FROM golang:1.22-alpine AS builder
 
-WORKDIR /app
+WORKDIR /build
 
-# Install necessary build tools and runtime dependencies
-RUN apk add --no-cache gcc musl-dev bash postgresql-client 
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev
 
-# Install golang-migrate 
-RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.0
-
-# Copy go.mod and go.sum files
+# Copy go mod files
 COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy the source code
+# Copy source code
 COPY . .
 
-RUN echo "Project structure:" && \
-    find . -type f -print
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/main.go
 
-# Build the application with verbose output
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o ./main ./cmd/main.go
+# Final stage
+FROM alpine:latest
 
-RUN echo "Project structure:" && \
-    find . -type f -print
+WORKDIR /app
 
-# Expose port 8080
-EXPOSE 8080
+# Install runtime dependencies
+RUN apk add --no-cache postgresql-client bash
 
-# Copy entrypoint script
-COPY scripts/entrypoint.sh /
+# Install golang-migrate
+RUN wget https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz \
+    && tar -xf migrate.linux-amd64.tar.gz \
+    && mv migrate /usr/local/bin/migrate \
+    && rm migrate.linux-amd64.tar.gz
+
+# Copy binary from builder
+COPY --from=builder /build/main .
+
+# Copy migrations and scripts
+COPY migrations/ ./migrations/
+COPY scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+EXPOSE 8080
 
 ENTRYPOINT ["/entrypoint.sh"]
