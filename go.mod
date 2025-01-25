@@ -1,4 +1,4 @@
-module options-manager
+module option-manager
 
 go 1.22
 

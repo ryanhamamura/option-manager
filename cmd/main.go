@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-  "options-manager/internal/database"
+  "option-manager/internal/database"
 	_ "github.com/lib/pq"
 )
 
