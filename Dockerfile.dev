@@ -65,6 +65,9 @@ RUN sh -c "$(wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools
 RUN rm -rf ~/.config/nvim ~/.local/share/nvim && \
     git clone https://github.com/NvChad/starter ~/.config/nvim
 
+# Copy custom NvChad configuration 
+COPY .devcontainer/nvim/ ~/.config/nvim/
+
 WORKDIR /app
 
 ENV GOPATH=/go
