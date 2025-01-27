@@ -1,8 +1,7 @@
+# Dockerfile.dev
 FROM golang:1.22-alpine
 
-WORKDIR /app 
-
-# Install development tools and dependencies
+# Install dependencies
 RUN apk add --no-cache \
     gcc \
     musl-dev \
@@ -10,24 +9,67 @@ RUN apk add --no-cache \
     bash \
     git \
     curl \
-    delve
+    wget \
+    delve \
+    alpine-sdk \
+    openssh \
+    zsh \
+    tmux \
+    sudo \
+    ripgrep \
+    fd \
+    fzf \
+    nodejs \
+    npm \
+    python3 \
+    build-base \
+    cmake \
+    make \
+    unzip \
+    tree-sitter \
+    gettext-dev
 
-# Install golang-migrate
-RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.0
+# Install latest neovim from source
+RUN git clone https://github.com/neovim/neovim \
+    && cd neovim \
+    && make CMAKE_BUILD_TYPE=RelWithDebInfo \
+    && make install \
+    && cd .. \
+    && rm -rf neovim
 
-# Install air for hot reloading
-RUN go install github.com/cosmtrek/air@v1.49.0
+# Create user
+ARG USERNAME=dev
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
 
-# Install development tools
-RUN go install golang.org/x/tools/gopls@v0.14.2 
-RUN go install github.com/go-delve/delve/cmd/dlv@v1.22.0
+RUN addgroup -g $USER_GID $USERNAME \
+    && adduser -s /bin/zsh -G $USERNAME -D -u $USER_UID $USERNAME \
+    && mkdir -p /etc/sudoers.d \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
 
-# Set up entrypoint permissions (the file will be mounted at runtime)
-RUN touch /usr/local/bin/dev-entrypoint.sh \
-    && chmod +x /usr/local/bin/dev-entrypoint.sh
+# Install Go tools
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.0 \
+    && go install github.com/cosmtrek/air@v1.49.0 \
+    && go install golang.org/x/tools/gopls@v0.14.2 \
+    && go install github.com/go-delve/delve/cmd/dlv@v1.22.0 \
+    && curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 
-EXPOSE 8080 2345 
+USER $USERNAME
+WORKDIR /home/$USERNAME
 
-ENTRYPOINT ["/usr/local/bin/dev-entrypoint.sh"]
-# The default CMD will be passed to the entrypoint 
-CMD ["go", "run", "cmd/main.go"]
+# Install oh-my-zsh
+RUN sh -c "$(wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O -)" "" --unattended
+
+# Install NvChad
+RUN rm -rf ~/.config/nvim ~/.local/share/nvim && \
+    git clone https://github.com/NvChad/starter ~/.config/nvim
+
+WORKDIR /app
+
+ENV GOPATH=/go
+ENV PATH=$PATH:/go/bin
+ENV EDITOR=nvim
+ENV TERM=xterm-256color
+
+CMD ["sleep", "infinity"]

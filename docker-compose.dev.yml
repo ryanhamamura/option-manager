@@ -6,13 +6,10 @@ services:
     volumes:
       - .:/app
       - go-cache:/go 
-      - ./scripts/dev-entrypoint.sh:/usr/local/bin/dev-entrypoint.sh
-    ports:
-      - "8080:8080"
-      - "2345:2345" # for delve debugger
     environment:
       - CGO_ENABLED=0
-    command: go run cmd/main.go 
+    tty: true 
+    stdin_open: true
 
 volumes:
   go-cache:
