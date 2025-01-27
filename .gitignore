@@ -9,3 +9,6 @@
 /vendor/
 /bin/
 .DS_Store
+
+.nvimlog
+main
