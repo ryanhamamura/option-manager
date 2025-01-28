@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
-	"log"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -26,7 +25,6 @@ type Session struct {
 }
 
 func AuthenticateUser(db *sql.DB, email, password string) (*User, error) {
-	log.Printf("Attempting to authenticate user: %s", email)
 	user := &User{}
 	query := `SELECT id, email, password_hash, first_name, last_name 
 			  FROM users WHERE email = $1`
@@ -41,21 +39,15 @@ func AuthenticateUser(db *sql.DB, email, password string) (*User, error) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			log.Printf("No user found with email: %s", email)
 			return nil, errors.New("invalid email or password")
 		}
-		log.Printf("Database error: %v", err)
 		return nil, err
 	}
-	log.Printf("Found user: %s", user.Email)
 
-	log.Printf("Stored hash: %s", user.PasswordHash)
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if err != nil {
-		log.Printf("Password comparison failed: %v", err)
 		return nil, errors.New("invalid email or password")
 	}
-	log.Printf("Password comparison successful")
 
 	return user, nil
 }
