@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /build
 
@@ -36,6 +36,7 @@ RUN wget https://github.com/golang-migrate/migrate/releases/download/v4.17.0/mig
 COPY --from=builder /build/main .
 
 # Copy migrations and scripts
+COPY templates/ ./templates/
 COPY migrations/ ./migrations/
 COPY scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

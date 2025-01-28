@@ -1,6 +1,6 @@
 .git
 .gitignore
-.env
+*.example
 *.exe
 *.exe~
 *.dll
