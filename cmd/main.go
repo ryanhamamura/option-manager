@@ -24,6 +24,12 @@ func main() {
 		log.Fatalf("Failed to initialize auth handler: %v", err)
 	}
 
+	// Initialize registration handler
+	registrationHandler, err := handlers.NewRegistrationHandler(db)
+	if err != nil {
+		log.Fatalf("Failed to initialize registration handler: %v", err)
+	}
+
 	// Routes
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
@@ -35,6 +41,7 @@ func main() {
 
 	http.HandleFunc("/login", authHandler.LoginPage)
 	http.HandleFunc("/logout", authHandler.Logout)
+	http.HandleFunc("/register", registrationHandler.RegisterPage)
 
 	// Protected routes
 	http.HandleFunc("/dashboard", handlers.RequireAuth(db, func(w http.ResponseWriter, r *http.Request) {
