@@ -65,6 +65,21 @@ services:
     stop_grace_period: 10s 
     stop_signal: SIGINT
 
+  pgadmin:
+    image: dpage/pgadmin4:7.8
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - app-network
+    depends_on:
+      - postgres
+
 volumes:
   postgres_data:
   pgadmin_data:
