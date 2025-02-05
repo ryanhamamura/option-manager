@@ -76,11 +76,35 @@
                             placeholder="Password"
                         >
                     </div>
+                    <div class="relative">
+                        <label for="password_confirm" class="sr-only">Confirm Password</label>
+                        <input 
+                            id="password_confirm"
+                            name="password_confirm"
+                            type="password"
+                            required
+                            class="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            placeholder="Confirm Password"
+                        >
+                    </div>
                 </div>
 
                 <div class="text-sm text-gray-500">
                     Password must be at least 8 characters long
                 </div>
+                
+                <script>
+                    document.getElementById('password_confirm').addEventListener('input', function(e) {
+                        const password = document.getElementById('password').value;
+                        const confirm = this.value;
+                        
+                        if (password !== confirm) {
+                            this.setCustomValidity('Passwords do not match');
+                        } else {
+                            this.setCustomValidity('');
+                        }
+                    });
+                </script>
 
                 <div>
                     <button
