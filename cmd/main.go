@@ -1,16 +1,27 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"text/template"
 
 	"option-manager/internal/database"
+	"option-manager/internal/email"
 	"option-manager/internal/handlers"
 
 	_ "github.com/lib/pq"
 )
 
 func main() {
+	// Log all relevant environment variables
+	log.Printf("Environment variables:")
+	log.Printf("AWS_REGION: %s", os.Getenv("AWS_REGION"))
+	log.Printf("EMAIL_SENDER: %s", os.Getenv("EMAIL_SENDER"))
+	log.Printf("AWS_ACCESS_KEY_ID: %s", maskString(os.Getenv("AWS_ACCESS_KEY_ID")))
+	log.Printf("AWS_SECRET_ACCESS_KEY: %s", maskString(os.Getenv("AWS_SECRET_ACCESS_KEY")))
+
 	// Initialize database
 	db, err := database.Connect()
 	if err != nil {
@@ -18,10 +29,31 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize email service
+	emailService, err := email.NewEmailService(
+		os.Getenv("AWS_REGION"),
+		os.Getenv("EMAIL_SENDER"),
+	)
+	if err != nil {
+		log.Fatalf("Failed to initialize email service: %v", err)
+	}
+
 	// Initialize handlers
 	authHandler, err := handlers.NewAuthHandler(db)
 	if err != nil {
 		log.Fatalf("Failed to initialize auth handler: %v", err)
+	}
+
+	log.Printf("Creating registration handler with email service...")
+	registrationHandler, err := handlers.NewRegistrationHandler(db, emailService)
+	if err != nil {
+		log.Fatalf("Failed to initialize registration handler: %v", err)
+	}
+	log.Printf("Registration handler created successfully")
+
+	verificationHandler, err := handlers.NewVerificationHandler(db)
+	if err != nil {
+		log.Fatalf("Failed to initialize verification handler: %v", err)
 	}
 
 	// Routes
@@ -35,6 +67,16 @@ func main() {
 
 	http.HandleFunc("/login", authHandler.LoginPage)
 	http.HandleFunc("/logout", authHandler.Logout)
+	http.HandleFunc("/register", registrationHandler.RegisterPage)
+	http.HandleFunc("/verify", verificationHandler.VerifyEmail)
+	http.HandleFunc("/verification-pending", func(w http.ResponseWriter, r *http.Request) {
+		tmpl, err := template.ParseFiles("templates/verification-pending.html")
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		tmpl.Execute(w, nil)
+	})
 
 	// Protected routes
 	http.HandleFunc("/dashboard", handlers.RequireAuth(db, func(w http.ResponseWriter, r *http.Request) {
@@ -56,4 +98,12 @@ func main() {
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// Helper function to mask sensitive values
+func maskString(s string) string {
+	if len(s) == 0 {
+		return "not set"
+	}
+	return "set (length: " + fmt.Sprint(len(s)) + ")"
 }

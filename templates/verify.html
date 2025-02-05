@@ -1,0 +1,45 @@
+{{/* templates/verify.html */}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Manager - Email Verification</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-100">
+    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-lg">
+            <div>
+                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    Email Verification
+                </h2>
+            </div>
+
+            {{if .Error}}
+            <div class="rounded-md bg-red-50 p-4">
+                <div class="text-sm text-red-700">
+                    {{.Error}}
+                </div>
+            </div>
+            {{end}}
+
+            {{if .Success}}
+            <div class="rounded-md bg-green-50 p-4">
+                <div class="text-sm text-green-700">
+                    {{.Success}}
+                </div>
+            </div>
+            {{end}}
+
+            <div class="mt-6">
+                <div class="text-center">
+                    <a href="/login" class="font-medium text-blue-600 hover:text-blue-500">
+                        Return to login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
