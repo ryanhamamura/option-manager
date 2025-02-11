@@ -116,8 +116,6 @@ func (h *RegistrationHandler) RegisterPage(w http.ResponseWriter, r *http.Reques
 		// Redirect to verification pending page
 		http.Redirect(w, r, "/verification-pending", http.StatusSeeOther)
 
-		// Redirect to dashboard
-		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
 
