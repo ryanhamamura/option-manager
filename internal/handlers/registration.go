@@ -16,25 +16,23 @@ type RegistrationPageData struct {
 
 type RegistrationHandler struct {
 	db           *sql.DB
-	template     *template.Template
 	emailService *email.EmailService
+	templates    *template.TemplateManager
 }
 
-func NewRegistrationHandler(db *sql.DB, emailService *email.EmailService) (*RegistrationHandler, error) {
+func NewRegistrationHandler(db *sql.DB, emailService *email.EmailService templates *template.TemplateManager) (*RegistrationHandler, error) {
 	log.Printf("Creating new registration handler...")
 	if emailService == nil {
 		return nil, fmt.Errorf("email service cannot be nil")
 	}
-
-	tmpl, err := template.ParseFiles("templates/register.html")
-	if err != nil {
-		return nil, err
+	if templates == nil {
+		return nil, fmt.Errorf("template manager cannot be nil") 
 	}
 
 	handler := &RegistrationHandler{
 		db:           db,
-		template:     tmpl,
 		emailService: emailService,
+		templates:		templates,
 	}
 
 	log.Printf("Registration handler created with email service: %v", emailService != nil)
@@ -46,9 +44,15 @@ func (h *RegistrationHandler) RegisterPage(w http.ResponseWriter, r *http.Reques
 
 	if h.emailService == nil {
 		log.Printf("Email service is nil in RegisterPage handler")
+		tmpl, err := h.templates.Get(template.RegisterPage)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 		h.template.Execute(w, RegistrationPageData{
 			Error: "Registration is temporarily unavailable. Please try again later.",
 		})
+		return
 	}
 
 	if r.Method == http.MethodGet {

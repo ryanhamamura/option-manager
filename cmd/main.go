@@ -5,11 +5,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"text/template"
 
 	"option-manager/internal/database"
 	"option-manager/internal/email"
 	"option-manager/internal/handlers"
+	"option-manager/internal/template"
 
 	_ "github.com/lib/pq"
 )
@@ -29,6 +29,12 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize template manager
+	tmplManager, err := template.NewManager()
+	if err != nil {
+		log.Fatalf("Failed to initialize template manager: %v", err)
+	}
+
 	// Initialize email service
 	emailService, err := email.NewEmailService(
 		os.Getenv("AWS_REGION"),
@@ -45,7 +51,7 @@ func main() {
 	}
 
 	log.Printf("Creating registration handler with email service...")
-	registrationHandler, err := handlers.NewRegistrationHandler(db, emailService)
+	registrationHandler, err := handlers.NewRegistrationHandler(db, emailService, tmplManager)
 	if err != nil {
 		log.Fatalf("Failed to initialize registration handler: %v", err)
 	}
