@@ -33,6 +33,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *User) error
 	FindByID(ctx context.Context, id int) (*User, error)
 	FindByEmail(ctx context.Context, email string) (*User, error)
+	FindByVerificationToken(ctx context.Context, token string) (*User, error)
 	UpdateVerificationStatus(ctx context.Context, userID int, verified bool) error
 	SetVerificationToken(ctx context.Context, userID int, token string, expiry time.Time) error
 }

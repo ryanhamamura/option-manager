@@ -69,6 +69,38 @@ func (r *UserRepo) FindByID(ctx context.Context, id int) (*repository.User, erro
 	return user, nil
 }
 
+func (r *UserRepo) FindByVerificationToken(ctx context.Context, token string) (*repository.User, error) {
+	user := &repository.User{}
+	query := `
+        SELECT 
+            id, email, password_hash, first_name, last_name,
+            email_verified, verification_token, verification_expires_at,
+            created_at, updated_at
+        FROM users 
+        WHERE verification_token = $1`
+
+	err := r.db.QueryRowContext(ctx, query, token).Scan(
+		&user.ID,
+		&user.Email,
+		&user.PasswordHash,
+		&user.FirstName,
+		&user.LastName,
+		&user.EmailVerified,
+		&user.VerificationToken,
+		&user.VerificationExpiry,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func (r *UserRepo) UpdateVerificationStatus(ctx context.Context, userID int, verified bool) error {
 	query := `
         UPDATE users 
