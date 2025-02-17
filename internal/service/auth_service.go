@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"option-manager/internal/repository"
 	"time"
 
@@ -17,11 +18,17 @@ type AuthService struct {
 	sessionRepo repository.SessionRepository
 }
 
-func NewAuthService(userRepo repository.UserRepository, sessionRepo repository.SessionRepository) *AuthService {
+func NewAuthService(userRepo repository.UserRepository, sessionRepo repository.SessionRepository) (*AuthService, error) {
+	if userRepo == nil {
+		return nil, fmt.Errorf("user repository is required")
+	}
+	if sessionRepo == nil {
+		return nil, fmt.Errorf("session repository is required")
+	}
 	return &AuthService{
 		userRepo:    userRepo,
 		sessionRepo: sessionRepo,
-	}
+	}, nil
 }
 
 type AuthenticateResponse struct {
@@ -30,10 +37,14 @@ type AuthenticateResponse struct {
 }
 
 func (s *AuthService) Authenticate(ctx context.Context, email, password string) (*AuthenticateResponse, error) {
+	if email == "" || password == "" {
+		return nil, errors.New("email and password are required")
+	}
+
 	// Find user by email
 	user, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error finding user: %w", err)
 	}
 	if user == nil {
 		return nil, errors.New("invalid email or password")
@@ -51,6 +62,10 @@ func (s *AuthService) Authenticate(ctx context.Context, email, password string) 
 }
 
 func (s *AuthService) CreateSession(ctx context.Context, userID int, rememberMe bool) (*repository.Session, error) {
+	if userID <= 0 {
+		return nil, errors.New("invalid user ID")
+	}
+
 	// Generate random session ID
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -73,16 +88,22 @@ func (s *AuthService) CreateSession(ctx context.Context, userID int, rememberMe 
 	}
 
 	if err := s.sessionRepo.Create(ctx, session); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
 	return session, nil
 }
 
 func (s *AuthService) GetSession(ctx context.Context, sessionID string) (*repository.Session, error) {
+	if sessionID == "" {
+		return nil, errors.New("session ID is required")
+	}
 	return s.sessionRepo.FindByID(ctx, sessionID)
 }
 
 func (s *AuthService) DeleteSession(ctx context.Context, sessionID string) error {
+	if sessionID == "" {
+		return errors.New("session ID is required")
+	}
 	return s.sessionRepo.Delete(ctx, sessionID)
 }
