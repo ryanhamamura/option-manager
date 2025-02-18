@@ -1,10 +1,9 @@
 package handlers
 
 import (
-	"database/sql"
 	"html/template"
 	"net/http"
-	"option-manager/internal/auth"
+	"option-manager/internal/service"
 )
 
 type VerificationData struct {
@@ -13,18 +12,18 @@ type VerificationData struct {
 }
 
 type VerificationHandler struct {
-	db       *sql.DB
+	services *service.Services
 	template *template.Template
 }
 
-func NewVerificationHandler(db *sql.DB) (*VerificationHandler, error) {
+func NewVerificationHandler(services *service.Services) (*VerificationHandler, error) {
 	tmpl, err := template.ParseFiles("templates/verify.html")
 	if err != nil {
 		return nil, err
 	}
 
 	return &VerificationHandler{
-		db:       db,
+		services: services,
 		template: tmpl,
 	}, nil
 }
@@ -38,7 +37,7 @@ func (h *VerificationHandler) VerifyEmail(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err := auth.VerifyEmail(h.db, token)
+	err := h.services.User.VerifyEmail(r.Context(), token)
 	if err != nil {
 		h.template.Execute(w, VerificationData{
 			Error: err.Error(),
@@ -49,4 +48,33 @@ func (h *VerificationHandler) VerifyEmail(w http.ResponseWriter, r *http.Request
 	h.template.Execute(w, VerificationData{
 		Success: "Your email has been verified! You can now log in.",
 	})
+}
+
+func RequireAuth(services *service.Services, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_id")
+		if err != nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		if _, err := services.Auth.GetSession(r.Context(), cookie.Value); err != nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		// If you need the session info later, uncomment and use this:
+		/*
+			session, err := auth.GetSession(db, cookie.Value)
+			if err != nil {
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+			// Store user info in request context
+			ctx := context.WithValue(r.Context(), "user_id", session.UserID)
+			r = r.WithContext(ctx)
+		*/
+
+		next(w, r)
+	}
 }

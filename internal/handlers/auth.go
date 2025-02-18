@@ -1,10 +1,9 @@
 package handlers
 
 import (
-	"database/sql"
 	"html/template"
 	"net/http"
-	"option-manager/internal/auth"
+	"option-manager/internal/service"
 	"time"
 )
 
@@ -13,18 +12,18 @@ type LoginPageData struct {
 }
 
 type AuthHandler struct {
-	db       *sql.DB
+	services *service.Services
 	template *template.Template
 }
 
-func NewAuthHandler(db *sql.DB) (*AuthHandler, error) {
+func NewAuthHandler(services *service.Services) (*AuthHandler, error) {
 	tmpl, err := template.ParseFiles("templates/login.html")
 	if err != nil {
 		return nil, err
 	}
 
 	return &AuthHandler{
-		db:       db,
+		services: services,
 		template: tmpl,
 	}, nil
 }
@@ -40,7 +39,7 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 		password := r.FormValue("password")
 		rememberMe := r.FormValue("remember-me") == "on"
 
-		user, err := auth.AuthenticateUser(h.db, email, password)
+		authResp, err := h.services.Auth.Authenticate(r.Context(), email, password)
 		if err != nil {
 			h.template.Execute(w, LoginPageData{
 				Error: err.Error(),
@@ -49,7 +48,7 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create session
-		session, err := auth.CreateSession(h.db, user.ID, rememberMe)
+		session, err := h.services.Auth.CreateSession(r.Context(), authResp.User.ID, rememberMe)
 		if err != nil {
 			h.template.Execute(w, LoginPageData{
 				Error: "Error creating session. Please try again.",
@@ -79,7 +78,7 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie("session_id"); err == nil {
-		auth.DeleteSession(h.db, cookie.Value)
+		h.services.Auth.DeleteSession(r.Context(), cookie.Value)
 
 		// Clear the cookie
 		http.SetCookie(w, &http.Cookie{
@@ -93,33 +92,4 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
-}
-
-func RequireAuth(db *sql.DB, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("session_id")
-		if err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		if _, err := auth.GetSession(db, cookie.Value); err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		// If you need the session info later, uncomment and use this:
-		/*
-			session, err := auth.GetSession(db, cookie.Value)
-			if err != nil {
-				http.Redirect(w, r, "/login", http.StatusSeeOther)
-				return
-			}
-			// Store user info in request context
-			ctx := context.WithValue(r.Context(), "user_id", session.UserID)
-			r = r.WithContext(ctx)
-		*/
-
-		next(w, r)
-	}
 }
