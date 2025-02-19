@@ -10,6 +10,7 @@ import (
 	"option-manager/internal/database"
 	"option-manager/internal/email"
 	"option-manager/internal/handlers"
+	"option-manager/internal/middleware"
 	"option-manager/internal/repository/postgres"
 	"option-manager/internal/service"
 
@@ -71,20 +72,34 @@ func main() {
 		log.Fatalf("Failed to initialize verification handler: %v", err)
 	}
 
+	// Initialize middleware stack
+	logMiddleware := middleware.Logger
+	recovererMiddleware := middleware.Recoverer
+	authMiddleware := middleware.RequireAuth(services)
+
 	// Routes
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// Root handler with middleware
+	rootHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 		http.NotFound(w, r)
 	})
+	http.Handle("/", middleware.Chain(rootHandler, logMiddleware, recovererMiddleware))
 
-	http.HandleFunc("/login", authHandler.LoginPage)
-	http.HandleFunc("/logout", authHandler.Logout)
-	http.HandleFunc("/register", registrationHandler.RegisterPage)
-	http.HandleFunc("/verify", verificationHandler.VerifyEmail)
-	http.HandleFunc("/verification-pending", func(w http.ResponseWriter, r *http.Request) {
+	// Public routes with basic middleware
+	loginHandler := http.HandlerFunc(authHandler.LoginPage)
+	http.Handle("/login", middleware.Chain(loginHandler, logMiddleware, recovererMiddleware))
+
+	registerHandler := http.HandlerFunc(registrationHandler.RegisterPage)
+	http.Handle("/register", middleware.Chain(registerHandler, logMiddleware, recovererMiddleware))
+
+	verifyHandler := http.HandlerFunc(verificationHandler.VerifyEmail)
+	http.Handle("/verify", middleware.Chain(verifyHandler, logMiddleware, recovererMiddleware))
+
+	// Verification pending page
+	verificationPendingHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles("templates/verification-pending.html")
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -92,22 +107,43 @@ func main() {
 		}
 		tmpl.Execute(w, nil)
 	})
+	http.Handle("/verification-pending", middleware.Chain(
+		verificationPendingHandler,
+		logMiddleware,
+		recovererMiddleware,
+	))
 
 	// Protected routes
-	http.HandleFunc("/dashboard", handlers.RequireAuth(services, func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Dashboard - Coming soon!"))
-	}))
+	// Protected routes with full middleware stack
+	dashboardHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok {
+			http.Error(w, "User not found in context", http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte(fmt.Sprintf("Dashboard for user %d - Coming soon!", userID)))
+	})
+	http.Handle("/dashboard", middleware.Chain(
+		dashboardHandler,
+		recovererMiddleware,
+		logMiddleware,
+		authMiddleware,
+	))
 
-	// Basic health check endpoint
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		err := db.Ping()
-		if err != nil {
+	// Logout with basic middleware
+	logoutHandler := http.HandlerFunc(authHandler.Logout)
+	http.Handle("/logout", middleware.Chain(logoutHandler, logMiddleware, recovererMiddleware))
+
+	// Health check endpoint
+	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := db.Ping(); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Database connection failed"))
 			return
 		}
 		w.Write([]byte("OK"))
 	})
+	http.Handle("/health", middleware.Chain(healthHandler, logMiddleware))
 
 	log.Println("Server starting on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
