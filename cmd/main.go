@@ -64,7 +64,7 @@ func main() {
 	services, err := service.NewServices(
 		repo,
 		emailClient,
-		os.Getenv("BASE_URL"),
+		cfg.App.BaseURL,
 	)
 	if err != nil {
 		log.Fatalf("Failed to initialize services: %v", err)

@@ -2,112 +2,213 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"html/template"
+	"net/url"
+	"option-manager/internal/config"
 	"option-manager/internal/email"
+	"path"
 )
 
 // EmailService handles all email-related operations
 type EmailService struct {
-	baseURL string
 	client  *email.Client
+	config  config.EmailConfig
+	baseURL string
 }
 
 // NewEmailService creates a new EmailService
-func NewEmailService(emailClient *email.Client, baseURL string) (*EmailService, error) {
+func NewEmailService(emailClient *email.Client, cfg config.EmailConfig, baseURL string) (*EmailService, error) {
 	if emailClient == nil {
 		return nil, fmt.Errorf("email client is required")
+	}
+	if cfg.SenderAddress == "" {
+		return nil, fmt.Errorf("sender address is required")
 	}
 	if baseURL == "" {
 		return nil, fmt.Errorf("base URL is required")
 	}
 
+	// Validate base URL format
+	_, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
+	}
+
 	return &EmailService{
 		client:  emailClient,
+		config:  cfg,
 		baseURL: baseURL,
 	}, nil
-}
 
-// VerificationEmailData holds data for verification email template
-type VerificationEmailData struct {
-	FirstName        string
-	VerificationLink string
 }
 
 // SendVerificationEmail sends an email verification link to the user
-func (s *EmailService) SendVerificationEmail(recipient, firstName, verificationToken string) error {
-	data := VerificationEmailData{
-		FirstName:        firstName,
-		VerificationLink: fmt.Sprintf("%s/verify?token=%s", s.baseURL, verificationToken),
+func (s *EmailService) SendVerificationEmail(ctx context.Context, recipient, firstName, verificationToken string) error {
+	if recipient == "" {
+		return fmt.Errorf("recipient email is required")
+	}
+	if firstName == "" {
+		return fmt.Errorf("first name is required")
+	}
+	if verificationToken == "" {
+		return fmt.Errorf("verification token is required")
 	}
 
-	// Parse and execute template
-	htmlContent, err := s.executeTemplate(verificationEmailTemplate, data)
+	// Build verification URL
+	verificationURL, err := url.Parse(s.baseURL)
 	if err != nil {
-		return fmt.Errorf("failed to generate email content: %v", err)
+		return fmt.Errorf("failed to parse base URL: %w", err)
 	}
+	verificationURL.Path = path.Join(verificationURL.Path, "verify")
+	q := verificationURL.Query()
+	q.Set("token", verificationToken)
+	verificationURL.RawQuery = q.Encode()
 
-	// Generate plain text version
-	textContent := fmt.Sprintf("Please verify your email by visiting: %s", data.VerificationLink)
-
-	// Send email using the client
 	content := &email.EmailContent{
 		To:       recipient,
 		Subject:  "Verify Your Email - Options Manager",
-		HTMLBody: htmlContent,
-		TextBody: textContent,
+		Template: "verification",
+		TemplateData: map[string]interface{}{
+			"FirstName":        firstName,
+			"VerificationLink": verificationURL.String(),
+		},
 	}
 
-	if err := s.client.Send(context.Background(), content); err != nil {
+	if err := s.client.Send(ctx, content); err != nil {
 		return fmt.Errorf("failed to send verification email: %w", err)
 	}
 
 	return nil
 }
 
-// executeTemplate is a helper function to execute HTML templates
-func (s *EmailService) executeTemplate(tmpl string, data interface{}) (string, error) {
-	t, err := template.New("email").Parse(tmpl)
+// SendPasswordResetEmail sends a password reset link to a user
+func (s *EmailService) SendPasswordResetEmail(ctx context.Context, recipient, firstName, resetToken string) error {
+	if recipient == "" {
+		return fmt.Errorf("recipient email is required")
+	}
+	if firstName == "" {
+		return fmt.Errorf("first name is required")
+	}
+	if resetToken == "" {
+		return fmt.Errorf("reset token is required")
+	}
+
+	// Build reset URL
+	resetURL, err := url.Parse(s.baseURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
+		return fmt.Errorf("failed to parse base URL: %w", err)
+	}
+	resetURL.Path = path.Join(resetURL.Path, "reset-password")
+	q := resetURL.Query()
+	q.Set("token", resetToken)
+	resetURL.RawQuery = q.Encode()
+
+	content := &email.EmailContent{
+		To:       recipient,
+		Subject:  "Reset Your Password - Options Manager",
+		Template: "reset_password",
+		TemplateData: map[string]interface{}{
+			"FirstName": firstName,
+			"ResetLink": resetURL.String(),
+		},
 	}
 
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, data); err != nil {
-		return "", err
+	if err := s.client.Send(ctx, content); err != nil {
+		return fmt.Errorf("failed to send password reset email: %w", err)
 	}
 
-	return buf.String(), nil
+	return nil
 }
 
-// Email templates
-const verificationEmailTemplate = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Verify Your Email</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2>Welcome to Options Manager!</h2>
-        <p>Hello {{.FirstName}},</p>
-        <p>Thank you for registering. Please verify your email address by clicking the button below:</p>
-        <p style="text-align: center;">
-            <a href="{{.VerificationLink}}" 
-               style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; 
-                      text-decoration: none; border-radius: 4px; font-weight: bold;">
-                Verify Email Address
-            </a>
-        </p>
-        <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-        <p>{{.VerificationLink}}</p>
-        <p>This link will expire in 24 hours.</p>
-        <p>If you didn't create an account, you can safely ignore this email.</p>
-        <br>
-        <p>Best regards,<br>The Options Manager Team</p>
-    </div>
-</body>
-</html>`
+// SendWelcomeEmail sends a welcome email to a newly verified user
+func (s *EmailService) SendWelcomeEmail(ctx context.Context, recipient, firstName string) error {
+	if recipient == "" {
+		return fmt.Errorf("recipient email is required")
+	}
+	if firstName == "" {
+		return fmt.Errorf("first name is required")
+	}
+
+	content := &email.EmailContent{
+		To:       recipient,
+		Subject:  "Welcome to Options Manager",
+		Template: "welcome",
+		TemplateData: map[string]interface{}{
+			"FirstName": firstName,
+			"LoginURL":  fmt.Sprintf("%s/login", s.baseURL),
+		},
+	}
+
+	if err := s.client.Send(ctx, content); err != nil {
+		return fmt.Errorf("failed to send welcome email: %w", err)
+	}
+
+	return nil
+}
+
+// IsEmailConfigured returns true if email sending is properly configured
+func (s *EmailService) IsEmailConfigured() bool {
+	return s.config.SenderAddress != "" && s.client != nil
+}
+
+// GetSenderAddress returns the configured sender address
+func (s *EmailService) GetSenderAddress() string {
+	return s.config.SenderAddress
+}
+
+// For testing and development
+type MockEmailService struct {
+	SentEmails []MockEmail
+}
+
+type MockEmail struct {
+	To           string
+	Subject      string
+	Template     string
+	TemplateData map[string]interface{}
+}
+
+func NewMockEmailService() *MockEmailService {
+	return &MockEmailService{
+		SentEmails: make([]MockEmail, 0),
+	}
+}
+
+func (m *MockEmailService) SendVerificationEmail(ctx context.Context, recipient, firstName, verificationToken string) error {
+	m.SentEmails = append(m.SentEmails, MockEmail{
+		To:       recipient,
+		Subject:  "Verify Your Email - Options Manager",
+		Template: "verification",
+		TemplateData: map[string]interface{}{
+			"FirstName":        firstName,
+			"VerificationLink": verificationToken,
+		},
+	})
+	return nil
+}
+
+func (m *MockEmailService) SendPasswordResetEmail(ctx context.Context, recipient, firstName, resetToken string) error {
+	m.SentEmails = append(m.SentEmails, MockEmail{
+		To:       recipient,
+		Subject:  "Reset Your Password - Options Manager",
+		Template: "reset_password",
+		TemplateData: map[string]interface{}{
+			"FirstName": firstName,
+			"ResetLink": resetToken,
+		},
+	})
+	return nil
+}
+
+func (m *MockEmailService) SendWelcomeEmail(ctx context.Context, recipient, firstName string) error {
+	m.SentEmails = append(m.SentEmails, MockEmail{
+		To:       recipient,
+		Subject:  "Welcome to Options Manager",
+		Template: "welcome",
+		TemplateData: map[string]interface{}{
+			"FirstName": firstName,
+		},
+	})
+	return nil
+}
