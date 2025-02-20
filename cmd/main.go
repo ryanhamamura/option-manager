@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"text/template"
 
+	"option-manager/internal/config"
 	"option-manager/internal/database"
 	"option-manager/internal/email"
 	"option-manager/internal/handlers"
@@ -19,6 +19,19 @@ import (
 )
 
 func main() {
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Configure logging
+	logFile, err := os.OpenFile(cfg.App.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logFile.Close()
+
 	// Log all relevant environment variables
 	log.Printf("Environment variables:")
 	log.Printf("AWS_REGION: %s", os.Getenv("AWS_REGION"))
@@ -26,32 +39,23 @@ func main() {
 	log.Printf("AWS_ACCESS_KEY_ID: %s", maskString(os.Getenv("AWS_ACCESS_KEY_ID")))
 	log.Printf("AWS_SECRET_ACCESS_KEY: %s", maskString(os.Getenv("AWS_SECRET_ACCESS_KEY")))
 
-	// Configure logging
-	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer logFile.Close()
-
-	// Use both file and stdout for logging
-	multiWriter := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(multiWriter)
-
 	// Initialize database
-	db, err := database.Connect()
+	db, err := database.Connect(cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer database.Close(db)
+
+	// Validate the connection
+	if err := database.ValidateConnection(db); err != nil {
+		log.Fatalf("Database validation failed: %v", err)
+	}
 
 	// Intialize repositories
 	repo := postgres.NewRepository(db)
 
 	// Initialize email client
-	emailClient, err := email.NewClient(
-		os.Getenv("AWS_REGION"),
-		os.Getenv("EMAIL_SENDER"),
-	)
+	emailClient, err := email.NewClient(cfg.Email, cfg.AWS)
 	if err != nil {
 		log.Fatalf("Failed to initialize email client: %v", err)
 	}
