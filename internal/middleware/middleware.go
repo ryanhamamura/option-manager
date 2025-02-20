@@ -66,15 +66,6 @@ func GetSession(ctx context.Context) (interface{}, bool) {
 
 // You can add more middleware functions here:
 
-// Logger logs request details
-func Logger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Log request details
-		// ... logging implementation ...
-		next.ServeHTTP(w, r)
-	})
-}
-
 // Recoverer handles panics
 func Recoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
