@@ -2,50 +2,31 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"text/template"
 
-	"option-manager/internal/database"
 	"option-manager/internal/email"
 	"option-manager/internal/handlers"
 	"option-manager/internal/middleware"
-	"option-manager/internal/repository/postgres"
+	"option-manager/internal/repository"
 	"option-manager/internal/service"
 
 	_ "github.com/lib/pq"
 )
 
 func main() {
-	// Log all relevant environment variables
-	log.Printf("Environment variables:")
-	log.Printf("AWS_REGION: %s", os.Getenv("AWS_REGION"))
-	log.Printf("EMAIL_SENDER: %s", os.Getenv("EMAIL_SENDER"))
-	log.Printf("AWS_ACCESS_KEY_ID: %s", maskString(os.Getenv("AWS_ACCESS_KEY_ID")))
-	log.Printf("AWS_SECRET_ACCESS_KEY: %s", maskString(os.Getenv("AWS_SECRET_ACCESS_KEY")))
 
-	// Configure logging
-	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer logFile.Close()
+	dbURL := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+	)
 
-	// Use both file and stdout for logging
-	multiWriter := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(multiWriter)
-
-	// Initialize database
-	db, err := database.Connect()
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer db.Close()
-
-	// Intialize repositories
-	repo := postgres.NewRepository(db)
+	repo := repository.New(dbURL)
 
 	// Initialize email client
 	emailClient, err := email.NewClient(

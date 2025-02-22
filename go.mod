@@ -1,13 +1,16 @@
 module option-manager
 
-go 1.23
+go 1.23.0
+
+toolchain go1.23.6
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.0
 	github.com/aws/aws-sdk-go-v2/config v1.29.5
 	github.com/aws/aws-sdk-go-v2/service/ses v1.29.9
+	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
-	golang.org/x/crypto v0.32.0
+	golang.org/x/crypto v0.34.0
 )
 
 require (

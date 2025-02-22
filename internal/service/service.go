@@ -2,45 +2,63 @@
 package service
 
 import (
-	"fmt"
-	"option-manager/internal/email"
-	"option-manager/internal/repository"
+	"errors"
+	"option-manager/internal/types"
+	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
-type Services struct {
-	Auth  *AuthService
-	User  *UserService
-	Email *EmailService
+// Service defines the interface for business logic
+type Service interface {
+	RegisterUser(email, firstName, lastName, password string) (types.User, error)
 }
 
-func NewServices(repo *repository.Repository, emailClient *email.Client, baseURL string) (*Services, error) {
-	if repo == nil {
-		return nil, fmt.Errorf("repository is required")
-	}
-	if baseURL == "" {
-		return nil, fmt.Errorf("base URL is required")
-	}
-
-	// Create EmailService first since other services depend on it
-	emailService, err := NewEmailService(emailClient, baseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create email service: %w", err)
-	}
-
-	// Create AuthService
-	authService, err := NewAuthService(repo.User, repo.Session)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create auth service: %w", err)
-	}
-
-	// Create UserService
-	userService, err := NewUserService(repo.User, emailService)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create user service: %w", err)
-	}
-	return &Services{
-		Auth:  authService,
-		User:  userService,
-		Email: emailService,
-	}, nil
+// Repository is the data access interface (defined here for simplicity)
+type Repository interface {
+	SaveUser(user types.User) error
 }
+
+// service is the concrete implementation
+type service struct {
+	repo Repository
+}
+
+// New creates a new service instance
+func New(repo Repository) Service {
+	return &service{repo: repo}
+}
+
+// CreateUser creates a new user with the given name
+func (s *service) RegisterUser(email, firstName, lastName, password string) (types.User, error) {
+	// Basic validation
+	if email == "" || firstName == "" || lastName == "" || password == "" {
+		return types.User{}, errors.New("All fields (email, first name, last name, password) are required")
+	}
+
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return types.User{}, errors.New("failed to hash password: " + err.Error())
+	}
+
+	now := time.Now()
+	user := types.User{
+		ID:           generateID(),
+		Email:        email,
+		FirstName:    firstName,
+		LastName:     lastName,
+		PasswordHash: string(hashedPassword), // Store the hash
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.repo.SaveUser(user); err != nil {
+		return types.User{}, errors.New("failed to register user: " + err.Error())
+	}
+
+	return user, nil
+}
+
+func generateID() string { return uuid.New().String() }
