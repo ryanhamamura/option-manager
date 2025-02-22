@@ -34,7 +34,7 @@ func New(repo Repository) Service {
 func (s *service) RegisterUser(email, firstName, lastName, password string) (types.User, error) {
 	// Basic validation
 	if email == "" || firstName == "" || lastName == "" || password == "" {
-		return types.User{}, errors.New("All fields (email, first name, last name, password) are required")
+		return types.User{}, errors.New("all fields (email, first name, last name, password) are required")
 	}
 
 	// Hash the password
