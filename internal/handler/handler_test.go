@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"option-manager/internal/types"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -121,36 +120,30 @@ func TestRegisterUser(t *testing.T) {
 				t.Errorf("RegisterUser() status = %v, want %v", rr.Code, tt.wantStatus)
 			}
 
-			if tt.wantStatus == http.StatusOK {
-				var gotBody map[string]interface{}
-				if err := json.NewDecoder(rr.Body).Decode(&gotBody); err != nil {
-					t.Errorf("failed to decode JSON response: %v (body: %q)", err, rr.Body.String())
-					return
+			// All responses are now JSON
+			var gotBody map[string]interface{}
+			if err := json.NewDecoder(rr.Body).Decode(&gotBody); err != nil {
+				t.Errorf("failed to decode JSON response: %v (body: %q)", err, rr.Body.String())
+				return
+			}
+
+			for key, wantVal := range tt.wantBody {
+				gotVal, exists := gotBody[key]
+				if !exists {
+					t.Errorf("response missing key %q (got: %+v)", key, gotBody)
+					continue
 				}
-				for key, wantVal := range tt.wantBody {
-					gotVal, exists := gotBody[key]
-					if !exists {
-						t.Errorf("response missing key %q (got: %+v)", key, gotBody)
+				if key == "createdAt" || key == "updatedAt" {
+					gotTime, err := time.Parse(time.RFC3339, gotVal.(string))
+					if err != nil {
+						t.Errorf("failed to parse %s time %v: %v", key, gotVal, err)
 						continue
 					}
-					if key == "createdAt" || key == "updatedAt" {
-						gotTime, err := time.Parse(time.RFC3339, gotVal.(string))
-						if err != nil {
-							t.Errorf("failed to parse %s time %v: %v", key, gotVal, err)
-							continue
-						}
-						if diff := gotTime.Sub(tt.registerResult.CreatedAt); diff > time.Second || diff < -time.Second {
-							t.Errorf("response %s = %v, want approximately %v (diff: %v)", key, gotTime, tt.registerResult.CreatedAt, diff)
-						}
-					} else if !reflect.DeepEqual(gotVal, wantVal) {
-						t.Errorf("response %s = %v, want %v", key, gotVal, wantVal)
+					if diff := gotTime.Sub(tt.registerResult.CreatedAt); diff > time.Second || diff < -time.Second {
+						t.Errorf("response %s = %v, want approximately %v (diff: %v)", key, gotTime, tt.registerResult.CreatedAt, diff)
 					}
-				}
-			} else {
-				gotBody := strings.TrimSpace(rr.Body.String())
-				wantBody := tt.wantBody["error"].(string)
-				if gotBody != wantBody {
-					t.Errorf("response body = %q, want %q", gotBody, wantBody)
+				} else if !reflect.DeepEqual(gotVal, wantVal) {
+					t.Errorf("response %s = %v, want %v", key, gotVal, wantVal)
 				}
 			}
 		})

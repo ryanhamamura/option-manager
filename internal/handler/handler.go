@@ -19,8 +19,15 @@ func New(svc service.Service) *Handler {
 
 // RegisterUser handles the HTTP registration request.
 func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	// Set Content-Type for all responses
+	w.Header().Set("Content-Type", "application/json")
+
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		errResponse := map[string]string{"error": "Method not allowed"}
+		if err := json.NewEncoder(w).Encode(errResponse); err != nil {
+			log.Printf("Failed to encode error response: %v", err)
+		}
 		return
 	}
 
@@ -31,17 +38,24 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		Password  string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		errResponse := map[string]string{"error": "Invalid request body"}
+		if err := json.NewEncoder(w).Encode(errResponse); err != nil {
+			log.Printf("Failed to encode error response: %v", err)
+		}
 		return
 	}
 
 	user, err := h.svc.RegisterUser(input.Email, input.FirstName, input.LastName, input.Password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		errResponse := map[string]string{"error": err.Error()}
+		if err := json.NewEncoder(w).Encode(errResponse); err != nil {
+			log.Printf("Failed to encode error response: %v", err)
+		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	response := map[string]interface{}{
 		"id":        user.ID,
 		"email":     user.Email,
