@@ -32,7 +32,7 @@ func New(dataSourceName string) service.Repository {
 func (r *postgresRepo) SaveUser(user types.User) error {
 	query := `INSERT INTO users (id, email, first_name, last_name, password_hash, created_at, updated_at) 
 						VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := r.db.Exec(query, user.ID, user.FirstName, user.LastName, user.PasswordHash, user.CreatedAt, user.UpdatedAt)
+	_, err := r.db.Exec(query, user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert user: %w", err)
 	}

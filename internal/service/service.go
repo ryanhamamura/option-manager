@@ -45,7 +45,7 @@ func (s *service) RegisterUser(email, firstName, lastName, password string) (typ
 
 	now := time.Now()
 	user := types.User{
-		ID:           generateID(),
+		ID:           uuid.New().String(),
 		Email:        email,
 		FirstName:    firstName,
 		LastName:     lastName,
@@ -60,5 +60,3 @@ func (s *service) RegisterUser(email, firstName, lastName, password string) (typ
 
 	return user, nil
 }
-
-func generateID() string { return uuid.New().String() }
