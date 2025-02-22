@@ -78,7 +78,7 @@ func (h *RegistrationHandler) RegisterPage(w http.ResponseWriter, r *http.Reques
 		}
 
 		// Send verification email
-		err = h.services.Email.SendVerificationEmail(user.Email, user.FirstName, token)
+		err = h.services.Email.SendVerificationEmail(r.Context(), user.Email, user.FirstName, token)
 		if err != nil {
 			h.template.Execute(w, RegistrationPageData{
 				Error: "Failed to send verification email. Please try again.",

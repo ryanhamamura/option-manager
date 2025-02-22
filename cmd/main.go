@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -32,12 +33,13 @@ func main() {
 	}
 	defer logFile.Close()
 
-	// Log all relevant environment variables
-	log.Printf("Environment variables:")
-	log.Printf("AWS_REGION: %s", os.Getenv("AWS_REGION"))
-	log.Printf("EMAIL_SENDER: %s", os.Getenv("EMAIL_SENDER"))
-	log.Printf("AWS_ACCESS_KEY_ID: %s", maskString(os.Getenv("AWS_ACCESS_KEY_ID")))
-	log.Printf("AWS_SECRET_ACCESS_KEY: %s", maskString(os.Getenv("AWS_SECRET_ACCESS_KEY")))
+	// Use both file and stdout for logging
+	multiWriter := io.MultiWriter(os.Stdout, logFile)
+	log.SetOutput(multiWriter)
+
+	// Log startup information
+	log.Printf("Starting application in %s mode", cfg.App.Environment)
+	log.Printf("Base URL: %s", cfg.App.BaseURL)
 
 	// Initialize database
 	db, err := database.Connect(cfg.Database)
