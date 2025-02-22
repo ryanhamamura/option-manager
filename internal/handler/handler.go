@@ -41,7 +41,6 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send success response with timestamps
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]interface{}{
 		"id":        user.ID,
