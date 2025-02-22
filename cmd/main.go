@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"option-manager/internal/handlers"
+	"option-manager/internal/handler"
 	"option-manager/internal/repository"
 	"option-manager/internal/service"
 
@@ -25,7 +25,7 @@ func main() {
 
 	repo := repository.New(dbURL)
 	svc := service.New(repo)
-	h := handlers.New(svc)
+	h := handler.New(svc)
 
 	http.HandleFunc("/register", h.RegisterUser)
 	fmt.Println("Server starting on :8080...")
