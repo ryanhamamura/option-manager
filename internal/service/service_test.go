@@ -1,20 +1,20 @@
-// internal/service/service.go
 package service
 
 import (
 	"errors"
 	"option-manager/internal/types"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 // mockRepository simulates the Repository interface for testing
 type mockRepository struct {
-	saveFunc func(user types.User) error
+	saveFunc func(user types.User) (types.User, error)
 }
 
-func (m *mockRepository) SaveUser(user types.User) error {
+func (m *mockRepository) SaveUser(user types.User) (types.User, error) {
 	return m.saveFunc(user)
 }
 
@@ -25,7 +25,7 @@ func TestRegisterUser(t *testing.T) {
 		firstName  string
 		lastName   string
 		password   string
-		saveErr    error
+		saveFunc   func(user types.User) (types.User, error)
 		wantErr    bool
 		wantErrMsg string
 		checkUser  func(t *testing.T, user types.User)
@@ -36,8 +36,14 @@ func TestRegisterUser(t *testing.T) {
 			firstName: "Alice",
 			lastName:  "Smith",
 			password:  "secret123",
-			saveErr:   nil,
-			wantErr:   false,
+			saveFunc: func(user types.User) (types.User, error) {
+				// Simulate PostgreSQL setting timestamps
+				now := time.Now()
+				user.CreatedAt = now
+				user.UpdatedAt = now
+				return user, nil
+			},
+			wantErr: false,
 			checkUser: func(t *testing.T, user types.User) {
 				if user.ID == "" {
 					t.Errorf("expected non-empty UUID, got empty")
@@ -60,32 +66,38 @@ func TestRegisterUser(t *testing.T) {
 			},
 		},
 		{
-			name:       "missing email",
-			email:      "",
-			firstName:  "Alice",
-			lastName:   "Smith",
-			password:   "secret123",
-			saveErr:    nil,
+			name:      "missing email",
+			email:     "",
+			firstName: "Alice",
+			lastName:  "Smith",
+			password:  "secret123",
+			saveFunc: func(user types.User) (types.User, error) {
+				return user, nil
+			},
 			wantErr:    true,
 			wantErrMsg: "all fields (email, first name, last name, password) are required",
 		},
 		{
-			name:       "missing password",
-			email:      "bob@example.com",
-			firstName:  "Bob",
-			lastName:   "Jones",
-			password:   "",
-			saveErr:    nil,
+			name:      "missing password",
+			email:     "bob@example.com",
+			firstName: "Bob",
+			lastName:  "Jones",
+			password:  "",
+			saveFunc: func(user types.User) (types.User, error) {
+				return user, nil
+			},
 			wantErr:    true,
 			wantErrMsg: "all fields (email, first name, last name, password) are required",
 		},
 		{
-			name:       "repository failure",
-			email:      "bob@example.com",
-			firstName:  "Bob",
-			lastName:   "Jones",
-			password:   "pass456",
-			saveErr:    errors.New("database connection lost"),
+			name:      "repository failure",
+			email:     "bob@example.com",
+			firstName: "Bob",
+			lastName:  "Jones",
+			password:  "pass456",
+			saveFunc: func(user types.User) (types.User, error) {
+				return user, errors.New("database connection lost")
+			},
 			wantErr:    true,
 			wantErrMsg: "failed to register user: database connection lost",
 		},
@@ -94,9 +106,7 @@ func TestRegisterUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &mockRepository{
-				saveFunc: func(user types.User) error {
-					return tt.saveErr
-				},
+				saveFunc: tt.saveFunc,
 			}
 			svc := New(repo)
 

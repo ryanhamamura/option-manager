@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"option-manager/internal/service"
 	"option-manager/internal/types"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -29,14 +30,18 @@ func New(dataSourceName string) service.Repository {
 	return &postgresRepo{db: db}
 }
 
-func (r *postgresRepo) SaveUser(user types.User) error {
-	query := `INSERT INTO users (id, email, first_name, last_name, password_hash, created_at, updated_at) 
-						VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := r.db.Exec(query, user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash, user.CreatedAt, user.UpdatedAt)
+func (r *postgresRepo) SaveUser(user types.User) (types.User, error) {
+	query := `INSERT INTO users (id, email, first_name, last_name, password_hash) 
+						VALUES ($1, $2, $3, $4, $5)
+						RETURNING created_at, updated_at`
+	var createdAt, updatedAt time.Time
+	_, err := r.db.Exec(query, user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash)
 	if err != nil {
-		return fmt.Errorf("failed to insert user: %w", err)
+		return types.User{}, fmt.Errorf("failed to insert user: %w", err)
 	}
-	return nil
+	user.CreatedAt = createdAt
+	user.UpdatedAt = updatedAt
+	return user, nil
 }
 
 // Close shuts down the database connection (optional, for cleanup)

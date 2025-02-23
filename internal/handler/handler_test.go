@@ -45,8 +45,6 @@ func TestRegisterUser(t *testing.T) {
 				FirstName:    "Alice",
 				LastName:     "Smith",
 				PasswordHash: "hashedpass",
-				CreatedAt:    time.Now(),
-				UpdatedAt:    time.Now(),
 			},
 			registerErr: nil,
 			wantStatus:  http.StatusOK,

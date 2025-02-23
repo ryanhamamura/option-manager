@@ -1,10 +1,8 @@
-// internal/service/service.go
 package service
 
 import (
 	"errors"
 	"option-manager/internal/types"
-	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -17,7 +15,7 @@ type Service interface {
 
 // Repository is the data access interface (defined here for simplicity)
 type Repository interface {
-	SaveUser(user types.User) error
+	SaveUser(user types.User) (types.User, error)
 }
 
 // service is the concrete implementation
@@ -43,20 +41,18 @@ func (s *service) RegisterUser(email, firstName, lastName, password string) (typ
 		return types.User{}, errors.New("failed to hash password: " + err.Error())
 	}
 
-	now := time.Now()
 	user := types.User{
 		ID:           uuid.New().String(),
 		Email:        email,
 		FirstName:    firstName,
 		LastName:     lastName,
 		PasswordHash: string(hashedPassword), // Store the hash
-		CreatedAt:    now,
-		UpdatedAt:    now,
 	}
 
-	if err := s.repo.SaveUser(user); err != nil {
+	updatedUser, err := s.repo.SaveUser(user)
+	if err != nil {
 		return types.User{}, errors.New("failed to register user: " + err.Error())
 	}
 
-	return user, nil
+	return updatedUser, nil
 }

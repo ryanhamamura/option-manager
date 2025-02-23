@@ -4,7 +4,6 @@ import (
 	"errors"
 	"option-manager/internal/types"
 	"testing"
-	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	_ "github.com/lib/pq"
@@ -23,13 +22,11 @@ func TestSaveUser_Postgres(t *testing.T) {
 		FirstName:    "Test",
 		LastName:     "User",
 		PasswordHash: "hashedpass",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
 	}
 
 	// Expect the INSERT query
-	mock.ExpectExec(`INSERT INTO users \(id, email, first_name, last_name, password_hash, created_at, updated_at\)`).
-		WithArgs(user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash, user.CreatedAt, user.UpdatedAt).
+	mock.ExpectExec(`INSERT INTO users \(id, email, first_name, last_name, password_hash\)`).
+		WithArgs(user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err = repo.SaveUser(user)
@@ -42,8 +39,8 @@ func TestSaveUser_Postgres(t *testing.T) {
 	}
 
 	// Test error case
-	mock.ExpectExec(`INSERT INTO users \(id, email, first_name, last_name, password_hash, created_at, updated_at\)`).
-		WithArgs(user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash, user.CreatedAt, user.UpdatedAt).
+	mock.ExpectExec(`INSERT INTO users \(id, email, first_name, last_name, password_hash\)`).
+		WithArgs(user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash).
 		WillReturnError(errors.New("duplicate key violation"))
 
 	err = repo.SaveUser(user)
