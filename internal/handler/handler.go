@@ -69,3 +69,50 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to encode response: %v", err)
 	}
 }
+
+// LoginUser handles the HTTP login request.
+func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		errResponse := map[string]string{"error": "Method not allowed"}
+		if err := json.NewEncoder(w).Encode(errResponse); err != nil {
+			log.Printf("Failed to encode error response: %v", err)
+		}
+		return
+	}
+
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		errResponse := map[string]string{"error": "Invalid request body"}
+		if err := json.NewEncoder(w).Encode(errResponse); err != nil {
+			log.Printf("Failed to encode error response: %v", err)
+		}
+	}
+
+	user, err := h.svc.LoginUser(input.Email, input.Password)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		errResponse := map[string]string{"error": err.Error()}
+		if err := json.NewEncoder(w).Encode(errResponse); err != nil {
+			log.Printf("Failed to encode error response: %v", err)
+		}
+		return
+	}
+
+	response := map[string]interface{}{
+		"id":        user.ID,
+		"email":     user.Email,
+		"firstName": user.FirstName,
+		"lastName":  user.LastName,
+		"message":   "Login successful",
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode response: %v", err)
+	}
+}

@@ -37,6 +37,7 @@ func (r *postgresRepo) SaveUser(user types.User) (types.User, error) {
 	var createdAt, updatedAt time.Time
 	_, err := r.db.Exec(query, user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash)
 	if err != nil {
+		fmt.Printf("SaveUser failed: %v\n", err)
 		return types.User{}, fmt.Errorf("failed to insert user: %w", err)
 	}
 	user.CreatedAt = createdAt

@@ -11,6 +11,7 @@ import (
 // Service defines the interface for business logic
 type Service interface {
 	RegisterUser(email, firstName, lastName, password string) (types.User, error)
+	LoginUser(email, password string) (types.User, error)
 }
 
 // Repository is the data access interface (defined here for simplicity)
@@ -56,4 +57,22 @@ func (s *service) RegisterUser(email, firstName, lastName, password string) (typ
 	}
 
 	return updatedUser, nil
+}
+
+// LoginUser authenticates a user by email and password.
+func (s *service) LoginUser(email, password string) (types.User, error) {
+	if email == "" || password == "" {
+		return types.User{}, errors.New("email and password are required")
+	}
+
+	user, err := s.repo.GetUserByEmail(email)
+	if err != nil {
+		return types.User{}, errors.New("invalid email or password")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return types.User{}, errors.New("invalid email or password")
+	}
+
+	return user, nil
 }
