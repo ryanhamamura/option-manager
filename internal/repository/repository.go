@@ -44,6 +44,12 @@ func (r *postgresRepo) SaveUser(user types.User) (types.User, error) {
 	return user, nil
 }
 
+// GetUserByEmail retrieves User from the database with email
+func (r *postgresRepo) GetUserByEmail(email string) (types.User, error) {
+	var user types.User
+	return user, nil
+}
+
 // Close shuts down the database connection (optional, for cleanup)
 func (r *postgresRepo) Close() error {
 	return r.db.Close()

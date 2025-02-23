@@ -16,6 +16,7 @@ type Service interface {
 // Repository is the data access interface (defined here for simplicity)
 type Repository interface {
 	SaveUser(user types.User) (types.User, error)
+	GetUserByEmail(email string) (types.User, error)
 }
 
 // service is the concrete implementation

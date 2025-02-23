@@ -3,12 +3,12 @@ package handler
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"option-manager/internal/repository"
 	"option-manager/internal/service"
-	"option-manager/internal/types"
 	"reflect"
 	"testing"
 	"time"
@@ -16,11 +16,11 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/lib/pq"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
 func TestRegisterUser_Integration(t *testing.T) {
-	// Start PostgreSQL container
 	ctx := context.Background()
 	pgContainer, err := postgres.Run(ctx,
 		"postgres:16-alpine",
@@ -37,14 +37,31 @@ func TestRegisterUser_Integration(t *testing.T) {
 		}
 	}()
 
-	// Get connection string
 	dsn, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
 		t.Fatalf("failed to get connection string: %v", err)
 	}
 
+	// Wait for PostgreSQL to be ready
+	const maxAttempts = 10
+	for i := 0; i < maxAttempts; i++ {
+		db, err := sql.Open("postgres", dsn)
+		if err != nil {
+			t.Logf("failed to open DB on attempt %d: %v", i+1, err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		defer db.Close()
+		if err := db.Ping(); err != nil {
+			t.Logf("ping failed on attempt %d: %v", i+1, err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		break
+	}
+
 	// Apply migrations
-	m, err := migrate.New("file://../../../migrations", dsn)
+	m, err := migrate.New("file://../../migrations", dsn)
 	if err != nil {
 		t.Fatalf("failed to initialize migrations: %v", err)
 	}
@@ -52,12 +69,10 @@ func TestRegisterUser_Integration(t *testing.T) {
 		t.Fatalf("failed to apply migrations: %v", err)
 	}
 
-	// Set up dependencies
 	repo := repository.New(dsn)
 	svc := service.New(repo)
 	h := New(svc)
 
-	// Test cases
 	tests := []struct {
 		name       string
 		body       string
@@ -137,20 +152,16 @@ func TestRegisterUser_Integration(t *testing.T) {
 
 			// Verify DB state for success case
 			if tt.wantStatus == http.StatusOK {
-				var dbUser types.User
-				err = repo.(*postgresRepo).db.QueryRow(
-					"SELECT id, email, first_name, last_name, password_hash, created_at, updated_at FROM users WHERE email = $1",
-					"alice@example.com",
-				).Scan(&dbUser.ID, &dbUser.Email, &dbUser.FirstName, &dbUser.LastName, &dbUser.PasswordHash, &dbUser.CreatedAt, &dbUser.UpdatedAt)
+				dbUser, err := repo.GetUserByEmail("alice@example.com")
 				if err != nil {
-					t.Errorf("failed to query user from DB: %v", err)
+					t.Errorf("failed to get user from DB: %v", err)
 					return
 				}
 				if dbUser.Email != "alice@example.com" {
 					t.Errorf("DB email = %v, want %v", dbUser.Email, "alice@example.com")
 				}
 				if dbUser.CreatedAt.IsZero() || dbUser.UpdatedAt.IsZero() {
-					t.Errorf("DB timestamps are zero, expected non-zero")
+					t.Errorf("DB timestamps are zero, expected non-zero: %v, %v", dbUser.CreatedAt, dbUser.UpdatedAt)
 				}
 			}
 		})
