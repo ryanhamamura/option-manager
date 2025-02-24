@@ -35,7 +35,7 @@ func (r *postgresRepo) SaveUser(user types.User) (types.User, error) {
 						VALUES ($1, $2, $3, $4, $5)
 						RETURNING created_at, updated_at`
 	var createdAt, updatedAt time.Time
-	_, err := r.db.Exec(query, user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash)
+	err := r.db.QueryRow(query, user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash).Scan(&createdAt, &updatedAt)
 	if err != nil {
 		fmt.Printf("SaveUser failed: %v\n", err)
 		return types.User{}, fmt.Errorf("failed to insert user: %w", err)
@@ -48,6 +48,18 @@ func (r *postgresRepo) SaveUser(user types.User) (types.User, error) {
 // GetUserByEmail retrieves User from the database with email
 func (r *postgresRepo) GetUserByEmail(email string) (types.User, error) {
 	var user types.User
+	query := `SELECT id, email, first_name, last_name, password_hash, created_at, updated_at
+						FROM users WHERE email = $1`
+	err := r.db.QueryRow(query, email).Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
+	if err == sql.ErrNoRows {
+		fmt.Printf("GetUserByEmail: no user found for email %s\n", email)
+		return types.User{}, fmt.Errorf("user not found: %w", err)
+	}
+	if err != nil {
+		fmt.Printf("GetUserByEmail failed: %v\n", err)
+		return types.User{}, fmt.Errorf("failed to get user: %w", err)
+	}
+	fmt.Printf("GetUserByEmail: succeeded: found user %+v\n", user)
 	return user, nil
 }
 

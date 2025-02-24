@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"option-manager/internal/types"
 
 	"github.com/google/uuid"
@@ -67,10 +68,13 @@ func (s *service) LoginUser(email, password string) (types.User, error) {
 
 	user, err := s.repo.GetUserByEmail(email)
 	if err != nil {
+		fmt.Printf("GetUserByEmail failed for %s: %v\n", email, err)
 		return types.User{}, errors.New("invalid email or password")
 	}
 
+	fmt.Printf("Retrieved user: %+v\n", user)
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		fmt.Printf("Password check failed: %v\n", err)
 		return types.User{}, errors.New("invalid email or password")
 	}
 

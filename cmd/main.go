@@ -32,6 +32,7 @@ func main() {
 	h := handler.New(svc)
 
 	http.HandleFunc("/register", h.RegisterUser)
+	http.HandleFunc("/login", h.LoginUser)
 	fmt.Println("Server starting on :8080...")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Server failed: %v", err)
