@@ -12,10 +12,18 @@ import (
 // mockRepository simulates the Repository interface for testing
 type mockRepository struct {
 	saveFunc func(user types.User) (types.User, error)
+	getFunc  func(email string) (types.User, error)
 }
 
 func (m *mockRepository) SaveUser(user types.User) (types.User, error) {
 	return m.saveFunc(user)
+}
+
+func (m *mockRepository) GetUserByEmail(email string) (types.User, error) {
+	if m.getFunc != nil {
+		return m.getFunc(email)
+	}
+	return types.User{}, errors.New("not implemented")
 }
 
 func TestRegisterUser(t *testing.T) {
