@@ -132,3 +132,101 @@ func TestRegisterUser(t *testing.T) {
 		})
 	}
 }
+
+func TestLoginUser(t *testing.T) {
+	// Pre-generate a bcrypt hash for "secret123"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("secret123"), bcrypt.DefaultCost)
+
+	tests := []struct {
+		name       string
+		email      string
+		password   string
+		getFunc    func(email string) (types.User, error)
+		wantErr    bool
+		wantErrMsg string
+		checkUser  func(t *testing.T, user types.User)
+	}{
+		{
+			name:     "successful login",
+			email:    "alice@example.com",
+			password: "secret123",
+			getFunc: func(email string) (types.User, error) {
+				return types.User{
+					ID:           "550e8400-e29b-41d4-a716-446655440000",
+					Email:        "alice@example.com",
+					FirstName:    "Alice",
+					LastName:     "Smith",
+					PasswordHash: string(hashedPassword),
+					CreatedAt:    time.Now(),
+					UpdatedAt:    time.Now(),
+				}, nil
+			},
+			wantErr: false,
+			checkUser: func(t *testing.T, user types.User) {
+				if user.ID != "550e8400-e29b-41d4-a716-446655440000" {
+					t.Errorf("expected ID %q, got %q", "550e8400-e29b-41d4-a716-446655440000", user.ID)
+				}
+				if user.Email != "alice@example.com" {
+					t.Errorf("expected email %q, got %q", "alice@example.com", user.Email)
+				}
+			},
+		},
+		{
+			name:     "invalid password",
+			email:    "alice@example.com",
+			password: "wrongpass",
+			getFunc: func(email string) (types.User, error) {
+				return types.User{
+					ID:           "550e8400-e29b-41d4-a716-446655440000",
+					Email:        "alice@example.com",
+					FirstName:    "Alice",
+					LastName:     "Smith",
+					PasswordHash: string(hashedPassword),
+				}, nil
+			},
+			wantErr:    true,
+			wantErrMsg: "invalid email or password",
+		},
+		{
+			name:     "user not found",
+			email:    "bob@example.com",
+			password: "secret123",
+			getFunc: func(email string) (types.User, error) {
+				return types.User{}, errors.New("user not found")
+			},
+			wantErr:    true,
+			wantErrMsg: "invalid email or password",
+		},
+		{
+			name:     "missing email",
+			email:    "",
+			password: "secret123",
+			getFunc: func(email string) (types.User, error) {
+				return types.User{}, errors.New("not implemented")
+			},
+			wantErr:    true,
+			wantErrMsg: "email and password are required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &mockRepository{
+				getFunc: tt.getFunc,
+			}
+			svc := New(repo)
+
+			got, err := svc.LoginUser(tt.email, tt.password)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoginUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && err != nil && err.Error() != tt.wantErrMsg {
+				t.Errorf("LoginUser() error msg = %q, want %q", err.Error(), tt.wantErrMsg)
+			}
+			if !tt.wantErr && tt.checkUser != nil {
+				tt.checkUser(t, got)
+			}
+		})
+	}
+}
