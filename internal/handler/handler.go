@@ -13,15 +13,21 @@ import (
 type Handler struct {
 	svc       service.Service
 	templates *template.Template
+	logger    *log.Logger
 }
 
 // New creates a new handler.
-func New(svc service.Service, tmpl *template.Template) *Handler {
-	return &Handler{svc: svc, templates: tmpl}
+func New(svc service.Service, tmpl *template.Template, logger *log.Logger) *Handler {
+	return &Handler{
+		svc:       svc,
+		templates: tmpl,
+		logger:    logger,
+	}
 }
 
 // GetPositions
 func (h *Handler) GetPositions(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	w.Header().Set("Content-Type", "text/html")
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -29,16 +35,19 @@ func (h *Handler) GetPositions(w http.ResponseWriter, r *http.Request) {
 	}
 	portfolioID := r.URL.Query().Get("portfolio_id")
 	if portfolioID == "" {
-		portfolioID = "port1" // Hardcoded for now; replace with auth later
+		// TODO: Replace with session-based portfolio selection after auth
+		portfolioID = "550e8400-e29b-41d4-a716-446655440000" // Hardcoded for now; replace with auth later
 	}
-	positions, err := h.svc.GetPositions(portfolioID)
+	positions, err := h.svc.GetPositions(ctx, portfolioID)
 	if err != nil {
+		h.logger.Printf("Failed to fetch positions for portfolio %s: %v", portfolioID, err)
 		http.Error(w, "Failed to fetch positions: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	for i, pos := range positions {
-		trades, err := h.svc.GetTrades(pos.ID)
+		trades, err := h.svc.GetTrades(ctx, pos.ID)
 		if err != nil {
+			h.logger.Printf("Failed to fetch trades for position %s: %v", pos.ID, err)
 			http.Error(w, "Failed to fetch trades: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -47,16 +56,16 @@ func (h *Handler) GetPositions(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Positions []types.Position
 		IsPremium bool
-	}{Positions: positions, IsPremium: true} // Hardcoded premium for now
+	}{Positions: positions, IsPremium: true} // TODO: Fetch from user session
 	if err := h.templates.ExecuteTemplate(w, "base.html", data); err != nil {
-		log.Printf("Failed to render template: %v", err)
+		h.logger.Printf("Failed to render template: %v", err)
 		http.Error(w, "Failed to render template", http.StatusInternalServerError)
 	}
-
 }
 
 // RegisterUser handles the HTTP registration request.
 func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	// Set Content-Type for all responses
 	w.Header().Set("Content-Type", "application/json")
 
@@ -84,7 +93,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.svc.RegisterUser(input.Email, input.FirstName, input.LastName, input.Password)
+	user, err := h.svc.RegisterUser(ctx, input.Email, input.FirstName, input.LastName, input.Password)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		errResponse := map[string]string{"error": err.Error()}
@@ -110,6 +119,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 // LoginUser handles the HTTP login request.
 func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodPost {
@@ -133,7 +143,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user, err := h.svc.LoginUser(input.Email, input.Password)
+	user, err := h.svc.LoginUser(ctx, input.Email, input.Password)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		errResponse := map[string]string{"error": err.Error()}

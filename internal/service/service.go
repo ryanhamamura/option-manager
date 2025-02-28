@@ -1,7 +1,7 @@
 package service
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"option-manager/internal/types"
 
@@ -11,18 +11,18 @@ import (
 
 // Service defines the interface for business logic
 type Service interface {
-	RegisterUser(email, firstName, lastName, password string) (types.User, error)
-	LoginUser(email, password string) (types.User, error)
-	GetPositions(portfolioID string) ([]types.Position, error)
-	GetTrades(positionID string) ([]types.Trade, error)
+	RegisterUser(ctx context.Context, email, firstName, lastName, password string) (types.User, error)
+	LoginUser(ctx context.Context, email, password string) (types.User, error)
+	GetPositions(ctx context.Context, portfolioID string) ([]types.Position, error)
+	GetTrades(ctx context.Context, positionID string) ([]types.Trade, error)
 }
 
 // Repository is the data access interface (defined here for simplicity)
 type Repository interface {
-	SaveUser(user types.User) (types.User, error)
-	GetUserByEmail(email string) (types.User, error)
-	GetPositions(portfolioID string) ([]types.Position, error)
-	GetTrades(positionID string) ([]types.Trade, error)
+	SaveUser(ctx context.Context, user types.User) (types.User, error)
+	GetUserByEmail(ctx context.Context, email string) (types.User, error)
+	GetPositions(ctx context.Context, portfolioID string) ([]types.Position, error)
+	GetTrades(ctx context.Context, positionID string) ([]types.Trade, error)
 }
 
 // service is the concrete implementation
@@ -40,16 +40,15 @@ func New(repo Repository) Service {
 }
 
 // CreateUser creates a new user with the given name
-func (s *service) RegisterUser(email, firstName, lastName, password string) (types.User, error) {
-	// Basic validation
-	if email == "" || firstName == "" || lastName == "" || password == "" {
-		return types.User{}, errors.New("all fields (email, first name, last name, password) are required")
+func (s *service) RegisterUser(ctx context.Context, email, firstName, lastName, password string) (types.User, error) {
+	if err := validateUserInput(email, firstName, lastName, password); err != nil {
+		return types.User{}, err
 	}
 
 	// Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return types.User{}, errors.New("failed to hash password: " + err.Error())
+		return types.User{}, fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	user := types.User{
@@ -59,40 +58,42 @@ func (s *service) RegisterUser(email, firstName, lastName, password string) (typ
 		LastName:     lastName,
 		PasswordHash: string(hashedPassword), // Store the hash
 	}
-
-	updatedUser, err := s.repo.SaveUser(user)
-	if err != nil {
-		return types.User{}, errors.New("failed to register user: " + err.Error())
-	}
-
-	return updatedUser, nil
+	return s.repo.SaveUser(ctx, user)
 }
 
 // LoginUser authenticates a user by email and password.
-func (s *service) LoginUser(email, password string) (types.User, error) {
+func (s *service) LoginUser(ctx context.Context, email, password string) (types.User, error) {
 	if email == "" || password == "" {
-		return types.User{}, errors.New("email and password are required")
+		return types.User{}, fmt.Errorf("email and password are required")
 	}
 
-	user, err := s.repo.GetUserByEmail(email)
+	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
-		fmt.Printf("GetUserByEmail failed for %s: %v\n", email, err)
-		return types.User{}, errors.New("invalid email or password")
+		return types.User{}, fmt.Errorf("invalid email or password")
 	}
-
-	fmt.Printf("Retrieved user: %+v\n", user)
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		fmt.Printf("Password check failed: %v\n", err)
-		return types.User{}, errors.New("invalid email or password")
+		return types.User{}, fmt.Errorf("invalid email or password")
 	}
-
 	return user, nil
 }
 
-func (s *service) GetPositions(portfolioID string) ([]types.Position, error) {
-	return s.repo.GetPositions(portfolioID)
+func (s *service) GetPositions(ctx context.Context, portfolioID string) ([]types.Position, error) {
+	if portfolioID == "" {
+		return nil, fmt.Errorf("portfolioID cannot be empty")
+	}
+	return s.repo.GetPositions(ctx, portfolioID)
 }
 
-func (s *service) GetTrades(positionID string) ([]types.Trade, error) {
-	return s.repo.GetTrades(positionID)
+func (s *service) GetTrades(ctx context.Context, positionID string) ([]types.Trade, error) {
+	if positionID == "" {
+		return nil, fmt.Errorf("positionID cannot be empty")
+	}
+	return s.repo.GetTrades(ctx, positionID)
+}
+
+func validateUserInput(email, firstName, lastName, password string) error {
+	if email == "" || firstName == "" || lastName == "" || password == "" {
+		return fmt.Errorf("all fields (email, first name, last name, password) are required")
+	}
+	return nil
 }

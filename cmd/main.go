@@ -50,7 +50,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	h := handler.New(svc, templates)
+	logger := log.New(os.Stdout, "options-manager: ", log.LstdFlags)
+	h := handler.New(svc, templates, logger)
 	server := &Server{
 		Handler: h,
 		Config:  cfg,

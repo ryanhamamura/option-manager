@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"option-manager/internal/service"
@@ -30,12 +31,12 @@ func New(dataSourceName string) service.Repository {
 	return &postgresRepo{db: db}
 }
 
-func (r *postgresRepo) SaveUser(user types.User) (types.User, error) {
+func (r *postgresRepo) SaveUser(ctx context.Context, user types.User) (types.User, error) {
 	query := `INSERT INTO users (id, email, first_name, last_name, password_hash) 
 						VALUES ($1, $2, $3, $4, $5)
 						RETURNING created_at, updated_at`
 	var createdAt, updatedAt time.Time
-	err := r.db.QueryRow(query, user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash).Scan(&createdAt, &updatedAt)
+	err := r.db.QueryRowContext(ctx, query, user.ID, user.Email, user.FirstName, user.LastName, user.PasswordHash).Scan(&createdAt, &updatedAt)
 	if err != nil {
 		fmt.Printf("SaveUser failed: %v\n", err)
 		return types.User{}, fmt.Errorf("failed to insert user: %w", err)
@@ -46,11 +47,11 @@ func (r *postgresRepo) SaveUser(user types.User) (types.User, error) {
 }
 
 // GetUserByEmail retrieves User from the database with email
-func (r *postgresRepo) GetUserByEmail(email string) (types.User, error) {
+func (r *postgresRepo) GetUserByEmail(ctx context.Context, email string) (types.User, error) {
 	var user types.User
 	query := `SELECT id, email, first_name, last_name, password_hash, created_at, updated_at
 						FROM users WHERE email = $1`
-	err := r.db.QueryRow(query, email).Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
+	err := r.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
 	if err == sql.ErrNoRows {
 		fmt.Printf("GetUserByEmail: no user found for email %s\n", email)
 		return types.User{}, fmt.Errorf("user not found: %w", err)
@@ -64,10 +65,10 @@ func (r *postgresRepo) GetUserByEmail(email string) (types.User, error) {
 }
 
 // GetPositions returns the Positions with portfolioID
-func (r *postgresRepo) GetPositions(portfolioID string) ([]types.Position, error) {
+func (r *postgresRepo) GetPositions(ctx context.Context, portfolioID string) ([]types.Position, error) {
 	query := `SELECT id, portfolio_id, nickname, trade_price, net_liq, open_pl, closed_pl, margin_required, delta, gamma, theta, vega, created_at, updated_at 
 						FROM positions WHERE portfolio_id = $1`
-	rows, err := r.db.Query(query, portfolioID)
+	rows, err := r.db.QueryContext(ctx, query, portfolioID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get positions: %v", err)
 	}
@@ -85,11 +86,11 @@ func (r *postgresRepo) GetPositions(portfolioID string) ([]types.Position, error
 }
 
 // GetTrades returns the Trades within a Position with positionID
-func (r *postgresRepo) GetTrades(positionID string) ([]types.Trade, error) {
+func (r *postgresRepo) GetTrades(ctx context.Context, positionID string) ([]types.Trade, error) {
 	query := `SELECT id, position_id, nickname, trade_type, status, net_cost, margin_required, commissions, fees, open_pl, closed_pl,
 										executed_at, created_at, updated_at
 						FROM trades WHERE position_id = $1`
-	rows, err := r.db.Query(query, positionID)
+	rows, err := r.db.QueryContext(ctx, query, positionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trades: %v", err)
 	}
@@ -103,7 +104,7 @@ func (r *postgresRepo) GetTrades(positionID string) ([]types.Trade, error) {
 		}
 		legQuery := `SELECT id, trade_id, symbol, quantity, strike, expiration, option_type, price, current_price, delta, gamma, theta, vega 
 								 FROM legs WHERE trade_id = $1`
-		legRows, err := r.db.Query(legQuery, t.ID)
+		legRows, err := r.db.QueryContext(ctx, legQuery, t.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get legs for trade %s: %v", t.ID, err)
 		}
