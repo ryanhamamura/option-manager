@@ -1,0 +1,10 @@
+{{define "position"}}
+<h2 class="text-xl font-semibold">{{.Nickname}}</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+    <div><span class="font-medium">Open P/L:</span> ${{printf "%.2f" .OpenPL}}</div>
+    <div><span class="font-medium">Closed P/L:</span> ${{printf "%.2f" .ClosedPL}}</div>
+    <div><span class="font-medium">Net Liq:</span> ${{printf "%.2f" .NetLiq}}</div>
+    <div><span class="font-medium">Margin:</span> ${{printf "%.2f" .MarginRequired}}</div>
+</div>
+<!-- Add more as needed -->
+{{end}}

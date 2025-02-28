@@ -1,0 +1,9 @@
+{{define "content"}}
+<div class="space-y-6">
+    {{range .Positions}}
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        {{template "position" .}}
+    </div>
+    {{end}}
+</div>
+{{end}}

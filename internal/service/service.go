@@ -13,22 +13,30 @@ import (
 type Service interface {
 	RegisterUser(email, firstName, lastName, password string) (types.User, error)
 	LoginUser(email, password string) (types.User, error)
+	GetPositions(portfolioID string) ([]types.Position, error)
+	GetTrades(positionID string) ([]types.Trade, error)
 }
 
 // Repository is the data access interface (defined here for simplicity)
 type Repository interface {
 	SaveUser(user types.User) (types.User, error)
 	GetUserByEmail(email string) (types.User, error)
+	GetPositions(portfolioID string) ([]types.Position, error)
+	GetTrades(positionID string) ([]types.Trade, error)
 }
 
 // service is the concrete implementation
 type service struct {
-	repo Repository
+	repo       Repository
+	quoteCache map[string]types.Quote
 }
 
 // New creates a new service instance
 func New(repo Repository) Service {
-	return &service{repo: repo}
+	return &service{
+		repo:       repo,
+		quoteCache: make(map[string]types.Quote),
+	}
 }
 
 // CreateUser creates a new user with the given name
@@ -79,4 +87,12 @@ func (s *service) LoginUser(email, password string) (types.User, error) {
 	}
 
 	return user, nil
+}
+
+func (s *service) GetPositions(portfolioID string) ([]types.Position, error) {
+	return s.repo.GetPositions(portfolioID)
+}
+
+func (s *service) GetTrades(positionID string) ([]types.Trade, error) {
+	return s.repo.GetTrades(positionID)
 }

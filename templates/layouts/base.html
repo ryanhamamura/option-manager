@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <title>Options Portfolio - Ryan Hamamura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --background: #ffffff; --text: #000000; }
+        [data-theme="dark"] { --background: #1a202c; --text: #ffffff; }
+        body { background-color: var(--background); color: var(--text); transition: background-color 0.3s, color 0.3s; }
+    </style>
+</head>
+<body class="p-6 font-sans">
+    {{template "header" .}}
+    <main class="container mx-auto">
+        {{block "content" .}}{{end}}
+    </main>
+    {{template "footer" .}}
+    <script>
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+        });
+    </script>
+</body>
+</html>

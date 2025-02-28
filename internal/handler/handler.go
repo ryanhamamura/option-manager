@@ -2,19 +2,57 @@ package handler
 
 import (
 	"encoding/json"
+	"html/template"
 	"log"
 	"net/http"
 	"option-manager/internal/service"
+	"option-manager/internal/types"
 )
 
 // Handler manages interaction with the service.
 type Handler struct {
-	svc service.Service
+	svc       service.Service
+	templates *template.Template
 }
 
 // New creates a new handler.
-func New(svc service.Service) *Handler {
-	return &Handler{svc: svc}
+func New(svc service.Service, tmpl *template.Template) *Handler {
+	return &Handler{svc: svc, templates: tmpl}
+}
+
+// GetPositions
+func (h *Handler) GetPositions(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	portfolioID := r.URL.Query().Get("portfolio_id")
+	if portfolioID == "" {
+		portfolioID = "port1" // Hardcoded for now; replace with auth later
+	}
+	positions, err := h.svc.GetPositions(portfolioID)
+	if err != nil {
+		http.Error(w, "Failed to fetch positions: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for i, pos := range positions {
+		trades, err := h.svc.GetTrades(pos.ID)
+		if err != nil {
+			http.Error(w, "Failed to fetch trades: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		positions[i].Trades = trades
+	}
+	data := struct {
+		Positions []types.Position
+		IsPremium bool
+	}{Positions: positions, IsPremium: true} // Hardcoded premium for now
+	if err := h.templates.ExecuteTemplate(w, "base.html", data); err != nil {
+		log.Printf("Failed to render template: %v", err)
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+	}
+
 }
 
 // RegisterUser handles the HTTP registration request.
