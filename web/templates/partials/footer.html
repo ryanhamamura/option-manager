@@ -1,0 +1,14 @@
+{{define "footer"}}
+<footer class="bg-gray-800 text-white py-6 mt-auto">
+    <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center">
+            <div>
+                <p>&copy; {{now.Year}} Trade Alert Monitor</p>
+            </div>
+            <div>
+                <p>Last updated: {{.time}}</p>
+            </div>
+        </div>
+    </div>
+</footer>
+{{end}}
